@@ -53,7 +53,7 @@
         if (![image conformsToProtocol:@protocol(YYAnimatedImage)]) return;
         UIPanGestureRecognizer *gesture = sender;
         CGPoint p = [gesture locationInView:gesture.view];
-        CGFloat progress = p.x / gesture.view.width;
+        CGFloat progress = fmax(p.x / gesture.view.width, 0);
         if (gesture.state == UIGestureRecognizerStateBegan) {
             previousIsPlaying = [_view isAnimating];
             [_view stopAnimating];

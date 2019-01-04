@@ -215,8 +215,10 @@ typedef struct {
 } yy_png_info;
 
 static void yy_png_chunk_IHDR_read(yy_png_chunk_IHDR *IHDR, const uint8_t *data) {
-    IHDR->width = yy_swap_endian_uint32(*((uint32_t *)(data)));
-    IHDR->height = yy_swap_endian_uint32(*((uint32_t *)(data + 4)));
+    uint32_t au32[2];
+    memcpy(au32, data, sizeof(au32));
+    IHDR->width = yy_swap_endian_uint32(au32[0]);//内存不对齐 (*((uint32_t *)(data)));
+    IHDR->height = yy_swap_endian_uint32(au32[1]);//内存不对齐 (*((uint32_t *)(data + 4)));
     IHDR->bit_depth = data[8];
     IHDR->color_type = data[9];
     IHDR->compression_method = data[10];
@@ -235,13 +237,17 @@ static void yy_png_chunk_IHDR_write(yy_png_chunk_IHDR *IHDR, uint8_t *data) {
 }
 
 static void yy_png_chunk_fcTL_read(yy_png_chunk_fcTL *fcTL, const uint8_t *data) {
-    fcTL->sequence_number = yy_swap_endian_uint32(*((uint32_t *)(data)));
-    fcTL->width = yy_swap_endian_uint32(*((uint32_t *)(data + 4)));
-    fcTL->height = yy_swap_endian_uint32(*((uint32_t *)(data + 8)));
-    fcTL->x_offset = yy_swap_endian_uint32(*((uint32_t *)(data + 12)));
-    fcTL->y_offset = yy_swap_endian_uint32(*((uint32_t *)(data + 16)));
-    fcTL->delay_num = yy_swap_endian_uint16(*((uint16_t *)(data + 20)));
-    fcTL->delay_den = yy_swap_endian_uint16(*((uint16_t *)(data + 22)));
+    uint32_t au32[5];
+    memcpy(au32, data, sizeof(au32));
+    fcTL->sequence_number = yy_swap_endian_uint32(au32[0]);//内存不对齐 (*((uint32_t *)(data)));
+    fcTL->width = yy_swap_endian_uint32(au32[1]);//内存不对齐 (*((uint32_t *)(data + 4)));
+    fcTL->height = yy_swap_endian_uint32(au32[2]);//内存不对齐 (*((uint32_t *)(data + 8)));
+    fcTL->x_offset = yy_swap_endian_uint32(au32[3]);//内存不对齐 (*((uint32_t *)(data + 12)));
+    fcTL->y_offset = yy_swap_endian_uint32(au32[4]);//内存不对齐 (*((uint32_t *)(data + 16)));
+    uint32_t au16[2];
+    memcpy(au16, data + sizeof(au32), sizeof(au16));
+    fcTL->delay_num = yy_swap_endian_uint16(au16[0]);//内存不对齐 (*((uint16_t *)(data + 20)));
+    fcTL->delay_den = yy_swap_endian_uint16(au16[1]);//内存不对齐 (*((uint16_t *)(data + 22)));
     fcTL->dispose_op = data[24];
     fcTL->blend_op = data[25];
 }
@@ -416,6 +422,7 @@ static yy_png_info *yy_png_info_create(const uint8_t *data, uint32_t length) {
     int32_t apng_sequence_index = -1;
     int32_t apng_frame_index = 0;
     int32_t apng_frame_number = -1;
+    uint32_t u32 = 0;
     bool apng_chunk_error = false;
     do {
         if (chunk_num >= chunk_capacity) {
@@ -430,23 +437,33 @@ static yy_png_info *yy_png_info_create(const uint8_t *data, uint32_t length) {
         yy_png_chunk_info *chunk = chunks + chunk_num;
         const uint8_t *chunk_data = data + offset;
         chunk->offset = offset;
-        chunk->length = yy_swap_endian_uint32(*((uint32_t *)chunk_data));
+        memcpy(&u32, chunk_data, sizeof(u32));
+        chunk->length = yy_swap_endian_uint32(u32);
+        //内存不对齐: chunk->length = yy_swap_endian_uint32(*((uint32_t *)chunk_data));
         if ((uint64_t)chunk->offset + (uint64_t)chunk->length + 12 > length) {
             free(chunks);
             return NULL;
         }
         
-        chunk->fourcc = *((uint32_t *)(chunk_data + 4));
+        memcpy(&u32, chunk_data + 4, sizeof(u32));
+        chunk->fourcc = u32;
+        //内存不对齐: chunk->fourcc = *((uint32_t *)(chunk_data + 4));
         if ((uint64_t)chunk->offset + 4 + chunk->length + 4 > (uint64_t)length) break;
-        chunk->crc32 = yy_swap_endian_uint32(*((uint32_t *)(chunk_data + 8 + chunk->length)));
+        memcpy(&u32, chunk_data + 8 + chunk->length, sizeof(u32));
+        chunk->crc32 = yy_swap_endian_uint32(u32);
+        //内存不对齐: chunk->crc32 = yy_swap_endian_uint32(*((uint32_t *)(chunk_data + 8 + chunk->length)));
         chunk_num++;
         offset += 12 + chunk->length;
         
         switch (chunk->fourcc) {
             case YY_FOUR_CC('a', 'c', 'T', 'L') : {
                 if (chunk->length == 8) {
-                    apng_frame_number = yy_swap_endian_uint32(*((uint32_t *)(chunk_data + 8)));
-                    apng_loop_num = yy_swap_endian_uint32(*((uint32_t *)(chunk_data + 12)));
+                    memcpy(&u32, chunk_data + 8, sizeof(u32));
+                    apng_frame_number = yy_swap_endian_uint32(u32);
+                    memcpy(&u32, chunk_data + 12, sizeof(u32));
+                    apng_loop_num = yy_swap_endian_uint32(u32);
+                    //内存不对齐: apng_frame_number = yy_swap_endian_uint32(*((uint32_t *)(chunk_data + 8)));
+                    //内存不对齐: apng_loop_num = yy_swap_endian_uint32(*((uint32_t *)(chunk_data + 12)));
                 } else {
                     apng_chunk_error = true;
                 }
@@ -461,7 +478,9 @@ static yy_png_info *yy_png_info_create(const uint8_t *data, uint32_t length) {
                     }
                 }
                 if (chunk->length > 4) {
-                    uint32_t sequence = yy_swap_endian_uint32(*((uint32_t *)(chunk_data + 8)));
+                    memcpy(&u32, chunk_data + 8, sizeof(u32));
+                    uint32_t sequence = yy_swap_endian_uint32(u32);
+                    //内存不对齐: uint32_t sequence = yy_swap_endian_uint32(*((uint32_t *)(chunk_data + 8)));
                     if (apng_sequence_index + 1 == sequence) {
                         apng_sequence_index++;
                     } else {
@@ -595,11 +614,17 @@ static uint8_t *yy_png_copy_frame_data_at_index(const uint8_t *data,
             for (uint32_t c = 0; c < frame_info->chunk_num; c++) {
                 yy_png_chunk_info *insert_chunk_info = info->chunks + frame_info->chunk_index + c;
                 if (insert_chunk_info->fourcc == YY_FOUR_CC('f', 'd', 'A', 'T')) {
-                    *((uint32_t *)(frame_data + data_offset)) = yy_swap_endian_uint32(insert_chunk_info->length - 4);
-                    *((uint32_t *)(frame_data + data_offset + 4)) = YY_FOUR_CC('I', 'D', 'A', 'T');
+                    //内存不对齐 *((uint32_t *)(frame_data + data_offset)) = yy_swap_endian_uint32(insert_chunk_info->length - 4);
+                    uint32_t u32 = yy_swap_endian_uint32(insert_chunk_info->length - 4);
+                    memcpy(frame_data + data_offset, &u32, sizeof(u32));
+                    //内存不对齐 *((uint32_t *)(frame_data + data_offset + 4)) = YY_FOUR_CC('I', 'D', 'A', 'T');
+                    u32 = YY_FOUR_CC('I', 'D', 'A', 'T');
+                    memcpy(frame_data + data_offset + 4, &u32, sizeof(u32));
                     memcpy(frame_data + data_offset + 8, data + insert_chunk_info->offset + 12, insert_chunk_info->length - 4);
                     uint32_t crc = (uint32_t)crc32(0, frame_data + data_offset + 4, insert_chunk_info->length);
-                    *((uint32_t *)(frame_data + data_offset + insert_chunk_info->length + 4)) = yy_swap_endian_uint32(crc);
+                    //内存不对齐 *((uint32_t *)(frame_data + data_offset + insert_chunk_info->length + 4)) = yy_swap_endian_uint32(crc);
+                    u32 = yy_swap_endian_uint32(crc);
+                    memcpy(frame_data + data_offset + insert_chunk_info->length + 4, &u32, sizeof(u32));
                     data_offset += insert_chunk_info->length + 8;
                 } else { // IDAT
                     memcpy(frame_data + data_offset, data + insert_chunk_info->offset, insert_chunk_info->length + 12);
@@ -615,7 +640,9 @@ static uint8_t *yy_png_copy_frame_data_at_index(const uint8_t *data,
             IHDR.width = frame_info->frame_control.width;
             IHDR.height = frame_info->frame_control.height;
             yy_png_chunk_IHDR_write(&IHDR, tmp + 8);
-            *((uint32_t *)(tmp + 21)) = yy_swap_endian_uint32((uint32_t)crc32(0, tmp + 4, 17));
+            uint32_t u32 = yy_swap_endian_uint32((uint32_t)crc32(0, tmp + 4, 17));
+            memcpy(tmp + 21, &u32, sizeof(u32));
+            //内存不对齐 *((uint32_t *)(tmp + 21)) = yy_swap_endian_uint32((uint32_t)crc32(0, tmp + 4, 17));
             memcpy(frame_data + data_offset, tmp, 25);
             data_offset += 25;
         } else {
