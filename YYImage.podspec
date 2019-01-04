@@ -22,7 +22,8 @@ Pod::Spec.new do |s|
 
   s.subspec 'libwebp' do |libwebp|
     libwebp.dependency 'YYImage/Core'
-    libwebp.dependency 'libwebp'
+    libwebp.dependency 'libwebp/demux'
+    libwebp.dependency 'libwebp/mux'
     libwebp.xcconfig = { 
       'USER_HEADER_SEARCH_PATHS' => '$(inherited) $(SRCROOT)/libwebp/src'
     }
